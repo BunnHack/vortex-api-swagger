@@ -3,9 +3,7 @@ info:
   title: Vortex / VortexStudio API
   version: 0.2.1
   description: |
-    Reverse-engineered API surface for Vortex (aka VortexStudio).
-    Source: cross-analysis of two binaries — VortexStudio 0.1.1 (dl.exe) and
-    Vortex 0.2.1 (embedded build string 0.3.0) — plus live probing of
+    API surface for Vortex (aka VortexStudio).
     playvortex.io (2026-08-21).
     Deprecated endpoints are marked with <deprecated: true> and return 404.
 servers:
