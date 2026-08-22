@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: Vortex / VortexStudio API
+  title: Vortex API
   version: 0.2.1
   description: |
-    API surface for Vortex (aka VortexStudio).
+    API surface for Vortex.
     playvortex.io (2026-08-21).
     Deprecated endpoints are marked with <deprecated: true> and return 404.
 servers:
