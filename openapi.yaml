@@ -1,0 +1,1563 @@
+openapi: 3.0.3
+info:
+  title: Vortex / VortexStudio API
+  version: 0.2.1
+  description: |
+    Reverse-engineered API surface for Vortex (aka VortexStudio).
+    Source: cross-analysis of two binaries — VortexStudio 0.1.1 (dl.exe) and
+    Vortex 0.2.1 (embedded build string 0.3.0) — plus live probing of
+    playvortex.io (2026-08-21).
+    Deprecated endpoints are marked with <deprecated: true> and return 404.
+servers:
+  - url: https://playvortex.io
+    description: Production (Cloudflare fronted)
+tags:
+  - name: Version
+    description: Build / version probe
+  - name: Distribution
+    description: Installer downloads
+  - name: Catalog
+    description: Game and asset catalog (unauthenticated)
+  - name: Queue
+    description: Instance join / queue / matchmaking (ticket-authenticated)
+  - name: Deprecated
+    description: Removed endpoints present in older builds (VortexStudio 0.1.1)
+  - name: Platform
+  - name: Account
+  - name: Users
+  - name: Social
+  - name: Moderation
+  - name: Security
+
+paths:
+  /api/studio-version:
+    get:
+      tags: [Version]
+      summary: Latest published version
+      description: Unauthenticated version probe. Present in both old and new builds; still live.
+      responses:
+        '200':
+          description: Current version
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version]
+                properties:
+                  version:
+                    type: string
+                    example: "0.2.1"
+
+  /download/windows:
+    get:
+      tags: [Distribution]
+      summary: Windows installer zip
+      description: GET-only (HEAD returns 404). Streams Vortex-Windows.zip (~61.8MB). Supersedes the deprecated /releases-studio path.
+      responses:
+        '200':
+          description: Vortex-Windows.zip (application/zip)
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+
+  /download/mac:
+    get:
+      tags: [Distribution]
+      summary: macOS installer dmg
+      responses:
+        '200':
+          description: Vortex.dmg (application/octet-stream)
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /download/linux:
+    get:
+      tags: [Distribution]
+      summary: Linux installer (not offered)
+      description: No Linux build exists. Returns 404.
+      responses:
+        '404':
+          description: Not found — no Linux build.
+
+  /api/games:
+    get:
+      tags: [Catalog]
+      summary: List published games
+      description: |
+        Unauthenticated. NOTE: new exposure added in 0.2.1 — absent from 0.1.1.
+        Trailing-slash variant /api/games/ returns 404.
+      responses:
+        '200':
+          description: Array of published games
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    name:
+                      type: string
+                      example: Demo
+                    description:
+                      type: string
+                    creator_id:
+                      type: integer
+                    creator_name:
+                      type: string
+                      example: TheHaloDeveloper
+                    thumbnail_version:
+                      type: string
+                    player_count:
+                      type: integer
+
+  /api/meshes:
+    get:
+      tags: [Catalog]
+      summary: Fetch meshes by id
+      description: Requires ?ids=. New endpoint (only in 0.2.1). Invalid ids -> 400.
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "1,2"
+      responses:
+        '200':
+          description: Mesh map
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid ids
+
+  /api/users/outfits:
+    get:
+      tags: [Catalog]
+      summary: Fetch user outfits by ids
+      description: Requires ?ids=. Present in both old and new builds.
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Outfits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  outfit:
+                    type: object
+                    properties:
+                      shirt_id:
+                        type: string
+                      pant_id:
+                        type: string
+                      body_type:
+                        type: string
+                      face_id:
+                        type: string
+                      body_colors:
+                        type: string
+        '422':
+          description: Missing required ids param
+
+  /api/clothing/images:
+    get:
+      tags: [Catalog]
+      summary: Fetch clothing images by ids
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Clothing images
+          content:
+            application/json:
+              schema:
+                type: object
+        '422':
+          description: Missing required ids param
+
+  /api/queue/join:
+    get:
+      tags: [Queue]
+      summary: Join a game instance queue
+      description: |
+        Ticket-authenticated. Requires X-App-Token / X-Hardware-Id headers and a
+        valid ticket + instance. Invalid ticket -> 404/422. Present only in 0.2.1.
+      parameters:
+        - name: game_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: instance_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: ticket
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Queue accepted / resume existing session
+        '404':
+          description: Instance not found
+        '422':
+          description: Invalid request (bad/missing ticket)
+
+  /api/queue/status:
+    get:
+      tags: [Queue]
+      summary: Query queue status
+      parameters:
+        - name: game_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: instance_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: ticket
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Queue status
+        '422':
+          description: Invalid request
+
+  # ------------------------------------------------------------------ web platform
+
+  /me:
+    get:
+      tags: [Account]
+      summary: Get current signed-in user
+      description: |
+        Returns a compact current-user identity used by the web client.
+        This response may include TOS/DOB gate flags.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUser'
+        '401':
+          description: Not signed in
+
+  /logout:
+    post:
+      tags: [Account]
+      summary: Sign out current session
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Signed out
+        '401':
+          description: Not signed in
+
+  /api/notice:
+    get:
+      tags: [Platform]
+      summary: Get active platform notice
+      responses:
+        '200':
+          description: Active notice, or an empty/no-message object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notice'
+
+  /api/studio-stats:
+    get:
+      tags: [Platform]
+      summary: Get Vortex Studio activity statistics
+      responses:
+        '200':
+          description: Studio statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityStats'
+
+  /api/game-stats:
+    get:
+      tags: [Catalog]
+      summary: Get game activity and visit statistics
+      responses:
+        '200':
+          description: Map keyed by game ID
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/ActivityStats'
+                example:
+                  "8":
+                    active: 24
+                    visits: 144329
+
+  /api/games/{gameId}:
+    get:
+      tags: [Catalog]
+      summary: Get game details and public server list
+      parameters:
+        - $ref: '#/components/parameters/GameId'
+        - name: page
+          in: query
+          required: false
+          description: Zero-based server-list page.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Game details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameDetail'
+        '404':
+          description: Game not found
+
+  /api/users/{userId}:
+    get:
+      tags: [Users]
+      summary: Get public profile data
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Public profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicUserProfile'
+        '404':
+          description: User not found
+
+  /api/users/search:
+    get:
+      tags: [Users]
+      summary: Search users by username
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+      responses:
+        '200':
+          description: Matching users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserListItem'
+
+  /api/users/avatar-pictures:
+    get:
+      tags: [Users]
+      summary: Fetch rendered avatar images for users
+      parameters:
+        - $ref: '#/components/parameters/Ids'
+      responses:
+        '200':
+          description: Map of user ID to image data URI
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                  description: data:image/... base64 data URI
+
+  /api/users/me:
+    get:
+      tags: [Account]
+      summary: Get account settings data
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Full account settings information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountUser'
+
+  /api/users/me/bio:
+    patch:
+      tags: [Users]
+      summary: Update own profile biography
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [bio]
+              properties:
+                bio:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Biography updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bio:
+                    type: string
+        '401':
+          description: Not signed in
+        '422':
+          description: Invalid biography
+
+  /api/users/me/ai-training-opt-out:
+    patch:
+      tags: [Account]
+      summary: Set AI-training opt-out preference
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [opt_out]
+              properties:
+                opt_out:
+                  type: boolean
+      responses:
+        '200':
+          description: Preference updated
+        '401':
+          description: Not signed in
+
+  /api/users/me/email:
+    patch:
+      tags: [Account]
+      summary: Change account email address
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Email updated; verification may be required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+        '400':
+          description: Invalid email or password
+        '401':
+          description: Not signed in
+
+  /api/users/me/email/send-verification:
+    post:
+      tags: [Account]
+      summary: Send verification email
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Verification email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+        '400':
+          description: Cannot send verification email
+        '401':
+          description: Not signed in
+
+  /api/users/me/password:
+    patch:
+      tags: [Account]
+      summary: Change account password
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password:
+                  type: string
+                  format: password
+                new_password:
+                  type: string
+                  format: password
+                  minLength: 8
+      responses:
+        '200':
+          description: Password updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+        '400':
+          description: Current password rejected or new password invalid
+        '401':
+          description: Not signed in
+
+  /api/users/me/sessions:
+    get:
+      tags: [Account]
+      summary: List active account sessions
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Active sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Session'
+
+  /api/users/me/sessions/{sessionId}:
+    delete:
+      tags: [Account]
+      summary: Revoke one non-current session
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Session revoked
+        '404':
+          description: Session not found
+
+  /api/users/me/sessions/revoke-all:
+    post:
+      tags: [Account]
+      summary: Revoke all other active sessions
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Other sessions revoked
+
+  /api/users/me/2fa/setup:
+    post:
+      tags: [Account]
+      summary: Begin TOTP two-factor setup
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [current_password]
+              properties:
+                current_password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: TOTP enrollment details
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [qr_code, secret]
+                properties:
+                  qr_code:
+                    type: string
+                    description: QR-code image/data URI for authenticator enrollment
+                  secret:
+                    type: string
+        '401':
+          description: Password invalid or not signed in
+
+  /api/users/me/2fa/confirm:
+    post:
+      tags: [Account]
+      summary: Confirm and enable TOTP two-factor authentication
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  description: Current authenticator TOTP code
+      responses:
+        '200':
+          description: TOTP enabled and recovery codes issued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [backup_codes]
+                properties:
+                  detail:
+                    type: string
+                  backup_codes:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          description: Invalid TOTP code
+
+  /api/users/me/2fa/backup-codes:
+    post:
+      tags: [Account]
+      summary: Regenerate TOTP recovery codes
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [current_password, code]
+              properties:
+                current_password:
+                  type: string
+                  format: password
+                code:
+                  type: string
+      responses:
+        '200':
+          description: New recovery codes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  backup_codes:
+                    type: array
+                    items:
+                      type: string
+
+  /api/users/me/2fa/disable:
+    post:
+      tags: [Account]
+      summary: Disable TOTP two-factor authentication
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [current_password, code]
+              properties:
+                current_password:
+                  type: string
+                  format: password
+                code:
+                  type: string
+      responses:
+        '200':
+          description: TOTP disabled
+        '400':
+          description: Password or code invalid
+
+  /api/tos/accept:
+    post:
+      tags: [Account]
+      summary: Accept Terms of Service and optionally provide date of birth
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: false
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                dob:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: Terms accepted
+        '422':
+          description: Date of birth required or invalid
+
+  /api/account/request-deletion:
+    post:
+      tags: [Account]
+      summary: Request account deletion
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Deletion request accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+
+  /api/friends/{userId}:
+    get:
+      tags: [Social]
+      summary: Get a user's friends
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Friends list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Friend'
+    delete:
+      tags: [Social]
+      summary: Remove a friend
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Friend removed
+        '404':
+          description: Friendship not found
+
+  /api/friends/requests/incoming:
+    get:
+      tags: [Social]
+      summary: List incoming friend requests
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Incoming friend requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IncomingFriendRequest'
+
+  /api/friends/requests/outgoing:
+    get:
+      tags: [Social]
+      summary: List outgoing friend requests
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Outgoing friend requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OutgoingFriendRequest'
+
+  /api/friends/requests/incoming/count:
+    get:
+      tags: [Social]
+      summary: Get incoming friend-request count
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Request count
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count]
+                properties:
+                  count:
+                    type: integer
+                    minimum: 0
+
+  /api/friends/request/{userId}:
+    post:
+      tags: [Social]
+      summary: Send a friend request
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Request sent or an incoming request was accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: string
+                    enum: [accepted, request_sent]
+    delete:
+      tags: [Social]
+      summary: Cancel outgoing friend request
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Request cancelled
+
+  /api/friends/accept/{requestId}:
+    post:
+      tags: [Social]
+      summary: Accept incoming friend request by request ID
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Friend request accepted
+
+  /api/friends/reject/{requestId}:
+    post:
+      tags: [Social]
+      summary: Reject incoming friend request by request ID
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Friend request rejected
+
+  /api/friends/accept-by-user/{userId}:
+    post:
+      tags: [Social]
+      summary: Accept an incoming request by sender user ID
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Friend request accepted
+
+  /api/friends/reject-by-user/{userId}:
+    post:
+      tags: [Social]
+      summary: Reject an incoming request by sender user ID
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Friend request rejected
+
+  /api/follow/{userId}:
+    post:
+      tags: [Social]
+      summary: Follow a user
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User followed
+    delete:
+      tags: [Social]
+      summary: Unfollow a user
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User unfollowed
+
+  /api/followers/{userId}:
+    get:
+      tags: [Social]
+      summary: List a user's followers
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Paginated followers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUsers'
+
+  /api/following/{userId}:
+    get:
+      tags: [Social]
+      summary: List users followed by a user
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Paginated following list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUsers'
+
+  /api/report/{userId}:
+    post:
+      tags: [Moderation]
+      summary: Report a user
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [category]
+              properties:
+                category:
+                  type: string
+                  enum:
+                    - username
+                    - bio
+                    - harassment
+                    - hate_speech
+                    - dating
+                    - spam
+                    - cheating
+                    - other
+                reason:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          description: Report submitted
+        '409':
+          description: Equivalent recent report already exists
+
+  /api/catalog/init:
+    get:
+      tags: [Catalog]
+      summary: Get catalog items and the signed-in user's current outfit
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Catalog and current outfit
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, body_type, body_colors, accessory_ids]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CatalogItem'
+                  shirt_id:
+                    type: integer
+                    nullable: true
+                  pant_id:
+                    type: integer
+                    nullable: true
+                  face_id:
+                    type: integer
+                    nullable: true
+                  body_type:
+                    type: string
+                    enum: [male, female]
+                  body_colors:
+                    type: array
+                    minItems: 6
+                    maxItems: 6
+                    items:
+                      type: string
+                      pattern: '^#[0-9a-fA-F]{6}$'
+                  accessory_ids:
+                    type: array
+                    items:
+                      type: integer
+
+  /api/catalog/thumbnails:
+    get:
+      tags: [Catalog]
+      summary: Fetch catalog item thumbnail data URIs
+      parameters:
+        - $ref: '#/components/parameters/Ids'
+      responses:
+        '200':
+          description: Item ID to thumbnail data-URI map
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+
+  /api/catalog/thumbnail/{itemId}:
+    get:
+      tags: [Catalog]
+      summary: Fetch one catalog thumbnail
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '200':
+          description: Thumbnail image
+          content:
+            image/png: {}
+            image/jpeg: {}
+        '404':
+          description: Catalog item not found
+
+  /api/clothing/image/{itemId}:
+    get:
+      tags: [Catalog]
+      summary: Fetch one clothing or face texture
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '200':
+          description: Texture image
+          content:
+            image/png: {}
+            image/jpeg: {}
+        '404':
+          description: Texture not found
+
+  /api/clothing/outfit:
+    put:
+      tags: [Catalog]
+      summary: Save current avatar outfit
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Outfit'
+      responses:
+        '200':
+          description: Outfit saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Invalid item IDs, body type, or colours
+
+  /api/mesh/{itemId}:
+    get:
+      tags: [Catalog]
+      summary: Fetch one accessory mesh
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '200':
+          description: Accessory GLTF/GLB mesh
+          content:
+            model/gltf-binary: {}
+            model/gltf+json: {}
+        '404':
+          description: Mesh not found
+
+  /api/fp-nonce:
+    get:
+      tags: [Security]
+      summary: Obtain a short-lived fingerprint challenge nonce
+      description: |
+        Used by the website's anti-abuse/fingerprint flow.
+        The challenge response endpoint and validation algorithm are intentionally
+        not specified here unless documented by the service owner.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Short-lived challenge
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [nonce, token]
+                properties:
+                  nonce:
+                    type: string
+                  token:
+                    type: string
+
+  # ------------------------------------------------------------------ deprecated
+
+  /releases-studio/VortexStudio-{version}windows:
+    get:
+      tags: [Deprecated]
+      summary: Legacy updater download path (VortexStudio 0.1.1)
+      description: |
+        DEPRECATED — returns 404. Old in-app updater target, replaced by
+        /download/windows. Note: no hyphen before "windows" in the URL shape
+        (VortexStudio-<version>windows).
+      parameters:
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "0.1.1"
+      deprecated: true
+      responses:
+        '404':
+          description: Gone — path removed
+
+  /api/catalog/hat/active:
+    get:
+      tags: [Deprecated]
+      summary: Legacy active hat catalog (VortexStudio 0.1.1)
+      description: DEPRECATED — returns 404. Related to current_hat.glb in old builds. Removed entirely from 0.2.1.
+      deprecated: true
+      responses:
+        '404':
+          description: Gone — path removed
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session_token
+      description: Browser session cookie. Never hard-code, commit, or share its value.
+    vertexAppToken:
+      type: apiKey
+      in: header
+      name: X-App-Token
+      description: Client application token (static literal in 0.1.1, replaced by ticket flow in 0.2.1)
+    hardwareId:
+      type: apiKey
+      in: header
+      name: X-Hardware-Id
+      description: Client hardware identifier used in the queue handshake
+
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: integer
+
+    GameId:
+      name: gameId
+      in: path
+      required: true
+      schema:
+        type: integer
+
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: integer
+
+    Ids:
+      name: ids
+      in: query
+      required: true
+      description: Comma-separated numeric IDs.
+      schema:
+        type: string
+        example: "1,2,3"
+
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+  schemas:
+    CurrentUser:
+      type: object
+      required: [id, username]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        tos_accepted:
+          type: boolean
+        needs_dob:
+          type: boolean
+
+    AccountUser:
+      allOf:
+        - $ref: '#/components/schemas/CurrentUser'
+        - type: object
+          properties:
+            email:
+              type: string
+              format: email
+              nullable: true
+            email_verified:
+              type: boolean
+            date_of_birth:
+              type: string
+              format: date
+              nullable: true
+            totp_enabled:
+              type: boolean
+            totp_backup_codes_remaining:
+              type: integer
+              minimum: 0
+            ai_training_opt_out:
+              type: boolean
+
+    PublicUserProfile:
+      type: object
+      required:
+        - id
+        - username
+        - friend_count
+        - follower_count
+        - following_count
+        - friendship_status
+        - follow_status
+        - is_deleted
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        bio:
+          type: string
+        friend_count:
+          type: integer
+        follower_count:
+          type: integer
+        following_count:
+          type: integer
+        visits:
+          type: integer
+        friendship_status:
+          type: string
+          enum: [self, friends, none, request_sent, request_received]
+        follow_status:
+          type: string
+          enum: [self, following, not_following, logged_out]
+        online_status:
+          type: string
+          enum: [offline, online, in_game, in_studio]
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_seen:
+          type: string
+          format: date-time
+          nullable: true
+        is_deleted:
+          type: boolean
+        is_staff:
+          type: boolean
+        is_moderator:
+          type: boolean
+        is_booster:
+          type: boolean
+        is_content_creator:
+          type: boolean
+        shirt_id:
+          type: integer
+          nullable: true
+
+    UserListItem:
+      type: object
+      required: [id, username]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        viewer_follows:
+          type: boolean
+
+    Friend:
+      allOf:
+        - $ref: '#/components/schemas/UserListItem'
+        - type: object
+          properties:
+            online_status:
+              type: string
+              enum: [offline, online, in_game, in_studio]
+
+    PaginatedUsers:
+      type: object
+      required: [items, total, has_more]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserListItem'
+        total:
+          type: integer
+          minimum: 0
+        has_more:
+          type: boolean
+
+    IncomingFriendRequest:
+      type: object
+      required: [id, from_user_id, from_username]
+      properties:
+        id:
+          type: integer
+        from_user_id:
+          type: integer
+        from_username:
+          type: string
+
+    OutgoingFriendRequest:
+      type: object
+      required: [id, to_user_id, to_username]
+      properties:
+        id:
+          type: integer
+        to_user_id:
+          type: integer
+        to_username:
+          type: string
+
+    ActivityStats:
+      type: object
+      required: [active, visits]
+      properties:
+        active:
+          type: integer
+          minimum: 0
+        visits:
+          type: integer
+          minimum: 0
+
+    GameDetail:
+      type: object
+      required: [id, name, creator_id, creator_name, instances, has_more]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        creator_id:
+          type: integer
+        creator_name:
+          type: string
+        thumbnail_version:
+          type: string
+          nullable: true
+        player_count:
+          type: integer
+        instances:
+          type: array
+          items:
+            type: object
+            required: [instance_id, players, user_ids]
+            properties:
+              instance_id:
+                type: integer
+              players:
+                type: integer
+              user_ids:
+                type: array
+                items:
+                  type: integer
+        total_instances:
+          type: integer
+        has_more:
+          type: boolean
+
+    CatalogItem:
+      type: object
+      required: [id, name, type, price]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum:
+            - shirt
+            - pant
+            - face
+            - hat
+            - hair
+            - face_accessory
+            - neck_accessory
+            - shoulder_accessory
+            - front_accessory
+            - back_accessory
+            - waist_accessory
+        price:
+          type: integer
+          minimum: 0
+        slug:
+          type: string
+          nullable: true
+
+    Outfit:
+      type: object
+      required: [body_type, body_colors, accessory_ids]
+      properties:
+        shirt_id:
+          type: integer
+          nullable: true
+        pant_id:
+          type: integer
+          nullable: true
+        face_id:
+          type: integer
+          nullable: true
+        body_type:
+          type: string
+          enum: [male, female]
+        body_colors:
+          type: array
+          minItems: 6
+          maxItems: 6
+          items:
+            type: string
+            pattern: '^#[0-9a-fA-F]{6}$'
+        accessory_ids:
+          type: array
+          items:
+            type: integer
+
+    Session:
+      type: object
+      required: [id, created_at, last_seen_at, is_current]
+      properties:
+        id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        last_seen_at:
+          type: string
+          format: date-time
+        ip:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+          nullable: true
+        is_current:
+          type: boolean
+
+    Notice:
+      type: object
+      properties:
+        message:
+          type: string
+          nullable: true
+        color:
+          type: string
+          enum: [yellow, red, blue]
+
+    DetailResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+
+    OkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+
+security:
+  - {}
