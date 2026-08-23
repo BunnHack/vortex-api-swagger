@@ -46,7 +46,7 @@ paths:
                     type: string
                     example: "0.2.1"
 
- /api/client-version:
+  /api/client-version:
     get:
       tags: [Version]
       summary: Latest client published version
