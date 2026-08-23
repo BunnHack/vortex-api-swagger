@@ -31,11 +31,11 @@ paths:
   /api/studio-version:
     get:
       tags: [Version]
-      summary: Latest published version
+      summary: Latest studio published version
       description: Unauthenticated version probe. Present in both old and new builds; still live.
       responses:
         '200':
-          description: Current version
+          description: Current studio version
           content:
             application/json:
               schema:
@@ -45,6 +45,24 @@ paths:
                   version:
                     type: string
                     example: "0.2.1"
+
+ /api/client-version:
+    get:
+      tags: [Version]
+      summary: Latest client published version
+      description: Unauthenticated version probe. Present in both old and new builds; still live.
+      responses:
+        '200':
+          description: Current client version
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version]
+                properties:
+                  version:
+                    type: string
+                    example: "0.3.0"                   
 
   /download/windows:
     get:
