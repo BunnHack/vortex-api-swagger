@@ -1432,8 +1432,7 @@ paths:
       summary: Obtain a short-lived fingerprint challenge nonce
       description: |
         Used by the website's anti-abuse/fingerprint flow.
-        The challenge response endpoint and validation algorithm are intentionally
-        not specified here unless documented by the service owner.
+        Useless api endpoint don't watch it
       security:
         - cookieAuth: []
       responses:
