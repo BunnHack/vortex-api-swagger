@@ -98,14 +98,14 @@ paths:
       description: No Linux build exists. Returns 404.
       responses:
         '404':
-          description: Not found — no Linux build.
+          description: Not found â€” no Linux build.
 
   /api/games:
     get:
       tags: [Catalog]
       summary: List published games
       description: |
-        Unauthenticated. NOTE: new exposure added in 0.2.1 — absent from 0.1.1.
+        Unauthenticated. NOTE: new exposure added in 0.2.1 â€” absent from 0.1.1.
         Trailing-slash variant /api/games/ returns 404.
       responses:
         '200':
@@ -289,6 +289,238 @@ paths:
                 $ref: '#/components/schemas/CurrentUser'
         '401':
           description: Not signed in
+
+  /login:
+    post:
+      tags: [Account]
+      summary: Sign in
+      description: |
+        Username-or-email + password. The client also submits fingerprint fields
+        produced by /js/fingerprint.js (fp-nonce challenge). On success sets the
+        session_token cookie; if the account has TOTP enabled the response instead
+        carries requires_2fa + pending_token for /login/2fa.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  description: Username or email
+                password:
+                  type: string
+                  format: password
+                fingerprint:
+                  type: string
+                  description: Client fingerprint token
+                fp_token:
+                  type: string
+                  description: Fingerprint challenge token (from /api/fp-nonce)
+      responses:
+        '200':
+          description: Session established, or 2FA required
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requires_2fa]
+                properties:
+                  requires_2fa:
+                    type: boolean
+                  pending_token:
+                    type: string
+                    nullable: true
+                    description: Present when requires_2fa is true; passed back to /login/2fa
+        '401':
+          description: Invalid credentials
+
+  /login/2fa:
+    post:
+      tags: [Account]
+      summary: Complete sign in with a 2FA / recovery code
+      description: Second step of TOTP sign-in. On success sets the session cookie.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [code, pending_token]
+              properties:
+                code:
+                  type: string
+                  description: 6-digit TOTP code or unused recovery code
+                pending_token:
+                  type: string
+                fingerprint:
+                  type: string
+                fp_token:
+                  type: string
+      responses:
+        '200':
+          description: Signed in
+        '401':
+          description: Invalid code or pending token
+
+  /register:
+    post:
+      tags: [Account]
+      summary: Create account (requires email verification)
+      description: |
+        The web form posts randomized field names (server-bound f_<hex> names); the
+        logical fields below are username, email, password, dob. Also includes a CSRF
+        form_token, a website honeypot field, an hCaptcha response, and the
+        fingerprint pair. Returns a pending_id used to resend/change the verification
+        email.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [username, email, password, dob]
+              properties:
+                form_token:
+                  type: string
+                username:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                dob:
+                  type: string
+                  format: date
+                h-captcha-response:
+                  type: string
+                fingerprint:
+                  type: string
+                fp_token:
+                  type: string
+                interaction:
+                  type: string
+                  description: Set to "1" when the visitor interacted with the page
+      responses:
+        '200':
+          description: Account created pending email verification
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pending_id]
+                properties:
+                  pending_id:
+                    type: string
+        '422':
+          description: Validation failed (e.g. email taken)
+
+  /api/register/resend:
+    post:
+      tags: [Account]
+      summary: Resend registration verification email
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [pending_id]
+              properties:
+                pending_id:
+                  type: string
+      responses:
+        '200':
+          description: Verification email resent
+
+  /api/register/change-email:
+    post:
+      tags: [Account]
+      summary: Change email on a pending registration and resend verification
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [pending_id, email]
+              properties:
+                pending_id:
+                  type: string
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Email updated and resent
+
+  /api/auth/forgot-password:
+    post:
+      tags: [Security]
+      summary: Request a password-reset email
+      description: Backed by hCaptcha.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                h_captcha_response:
+                  type: string
+      responses:
+        '200':
+          description: Reset email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+        '422':
+          description: Captcha missing or invalid
+
+  /api/auth/reset-password/{token}:
+    post:
+      tags: [Security]
+      summary: Reset password with a token from the reset email
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [new_password]
+              properties:
+                new_password:
+                  type: string
+                  format: password
+                  minLength: 8
+      responses:
+        '200':
+          description: Password reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+        '400':
+          description: Invalid or expired token / weak password
 
   /logout:
     post:
@@ -1124,6 +1356,39 @@ paths:
         '404':
           description: Texture not found
 
+  /api/clothing/shirt:
+    get:
+      tags: [Catalog]
+      summary: Fetch the currently-equipped shirt texture
+      description: |
+        Referenced in catalog.js EQUIP_CONFIG but not invoked by the current web
+        catalog page (the viewer applies the equipped-shirt texture directly). Status
+        on the live backend is unverified.
+      responses:
+        '200':
+          description: Shirt texture image
+          content:
+            image/png: {}
+            image/jpeg: {}
+        '404':
+          description: No shirt equipped or texture not found
+
+  /api/clothing/pants:
+    get:
+      tags: [Catalog]
+      summary: Fetch the currently-equipped pants texture
+      description: |
+        Referenced in catalog.js EQUIP_CONFIG but not invoked by the current web
+        catalog page. Status on the live backend is unverified.
+      responses:
+        '200':
+          description: Pants texture image
+          content:
+            image/png: {}
+            image/jpeg: {}
+        '404':
+          description: No pants equipped or texture not found
+
   /api/clothing/outfit:
     put:
       tags: [Catalog]
@@ -1192,7 +1457,7 @@ paths:
       tags: [Deprecated]
       summary: Legacy updater download path (VortexStudio 0.1.1)
       description: |
-        DEPRECATED — returns 404. Old in-app updater target, replaced by
+        DEPRECATED â€” returns 404. Old in-app updater target, replaced by
         /download/windows. Note: no hyphen before "windows" in the URL shape
         (VortexStudio-<version>windows).
       parameters:
@@ -1205,17 +1470,17 @@ paths:
       deprecated: true
       responses:
         '404':
-          description: Gone — path removed
+          description: Gone â€” path removed
 
   /api/catalog/hat/active:
     get:
       tags: [Deprecated]
       summary: Legacy active hat catalog (VortexStudio 0.1.1)
-      description: DEPRECATED — returns 404. Related to current_hat.glb in old builds. Removed entirely from 0.2.1.
+      description: DEPRECATED â€” returns 404. Related to current_hat.glb in old builds. Removed entirely from 0.2.1.
       deprecated: true
       responses:
         '404':
-          description: Gone — path removed
+          description: Gone â€” path removed
 
 components:
   securitySchemes:
