@@ -98,14 +98,31 @@ paths:
       description: No Linux build exists. Returns 404.
       responses:
         '404':
-          description: Not found â€” no Linux build.
+          description: Not found — no Linux build.
+
+  /download/studio-windows:
+    get:
+      tags: [Distribution]
+      summary: Windows studio editor zip
+      description: |
+        GET-only. Streams VortexStudio-Windows.zip (~44.9MB, application/zip)
+        containing a single VortexStudio.exe (editor / avatar client). Sibling of
+        /download/windows (the game client). Not present in 0.1.1; added later.
+      responses:
+        '200':
+          description: VortexStudio-Windows.zip (application/zip)
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
 
   /api/games:
     get:
       tags: [Catalog]
       summary: List published games
       description: |
-        Unauthenticated. NOTE: new exposure added in 0.2.1 â€” absent from 0.1.1.
+        Unauthenticated. NOTE: new exposure added in 0.2.1 — absent from 0.1.1.
         Trailing-slash variant /api/games/ returns 404.
       responses:
         '200':
@@ -270,6 +287,48 @@ paths:
           description: Invalid request
 
   # ------------------------------------------------------------------ web platform
+
+  /api/maps/{game_id}:
+    get:
+      tags: [Platform]
+      summary: Game map assets
+      description: |
+        GET-only (POST/PUT/DELETE -> 405). Returns the map/scene assets for a
+        published game. Confirmed to exist (returns 403, not 404) but gated:
+        a valid session for a NON-author user still gets 403 Forbidden, implying
+        owner/author privilege, not mere login. Not referenced by any public JS
+        or the desktop clients' string tables — an undocumented route. Payload
+        shape unknown until an author-credentialed request succeeds.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: game_id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "3"
+      responses:
+        '200':
+          description: Map asset payload (shape not yet captured)
+        '403':
+          description: Forbidden — requires author/owner session
+        '405':
+          description: Method not allowed (GET only)
+
+  /studio/launch:
+    get:
+      tags: [Platform]
+      summary: Launch studio from web
+      description: |
+        Web-side studio launcher route (linked from site nav). Seeds the native
+        app session then opens the vortex-studio:// scheme. Behavior
+        authenticated; not yet captured.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Launch response / redirect to vortex-studio:// scheme
 
   /me:
     get:
@@ -1432,7 +1491,7 @@ paths:
       summary: Obtain a short-lived fingerprint challenge nonce
       description: |
         Used by the website's anti-abuse/fingerprint flow.
-        Useless api endpoint don't watch it
+        uselss api
       security:
         - cookieAuth: []
       responses:
@@ -1456,7 +1515,7 @@ paths:
       tags: [Deprecated]
       summary: Legacy updater download path (VortexStudio 0.1.1)
       description: |
-        DEPRECATED â€” returns 404. Old in-app updater target, replaced by
+        DEPRECATED — returns 404. Old in-app updater target, replaced by
         /download/windows. Note: no hyphen before "windows" in the URL shape
         (VortexStudio-<version>windows).
       parameters:
@@ -1469,17 +1528,17 @@ paths:
       deprecated: true
       responses:
         '404':
-          description: Gone â€” path removed
+          description: Gone — path removed
 
   /api/catalog/hat/active:
     get:
       tags: [Deprecated]
       summary: Legacy active hat catalog (VortexStudio 0.1.1)
-      description: DEPRECATED â€” returns 404. Related to current_hat.glb in old builds. Removed entirely from 0.2.1.
+      description: DEPRECATED — returns 404. Related to current_hat.glb in old builds. Removed entirely from 0.2.1.
       deprecated: true
       responses:
         '404':
-          description: Gone â€” path removed
+          description: Gone — path removed
 
 components:
   securitySchemes:
