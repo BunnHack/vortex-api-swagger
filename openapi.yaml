@@ -297,8 +297,7 @@ paths:
         published game. Confirmed to exist (returns 403, not 404) but gated:
         a valid session for a NON-author user still gets 403 Forbidden, implying
         owner/author privilege, not mere login. Not referenced by any public JS
-        or the desktop clients' string tables — an undocumented route. Payload
-        shape unknown until an author-credentialed request succeeds.
+        or the desktop clients' string tables — unavailable api don't use it
       security:
         - cookieAuth: []
       parameters:
